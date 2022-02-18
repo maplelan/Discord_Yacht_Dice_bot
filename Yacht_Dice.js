@@ -2,8 +2,9 @@ const { MessageEmbed } = require('discord.js');
 const setting = require('./setting.json');
 const token = setting.token;
 const accChannelid = setting.accChannelID;//允許的頻道ID
-const savetype = setting.savetype;//資料儲存模式 ram = 僅存於記憶體(default), json = 存檔於JSON中(未實裝), [sql = 資料庫存取(預先設定好資料庫系統)(未實裝)]
+const savetype = setting.savetype;//資料儲存模式 ram = 僅存於記憶體(default), json = 存檔於JSON中
 const moneyunit = setting.moneyunit;//金錢單位 ex:元,G,個硬幣,根蘿蔔 之類的詞 設定成奇怪的東西可能會出事
+const keyword = setting.keyword;//邀請遊戲關鍵字
 let player = {};//玩家資料 playing=是否在遊戲中 matching=是否在配對中 match=對手的ID reply=是否等待回應中 bet=賭注 tableid=表格ID(邀請者ID)
 let table = {};//遊玩中分數表 id=受邀者id tablea=分數表a{} tableb=分數表b{} round = 輪數除二為回合數 stage = 現在的遊玩階段(1 初次擲骰完等待選擇骰子,2 重骰一次,3 等待選擇組合) dice = 骰子 {} bet = 賭注
 //分數表用索引 "1","2","3","4","5","6","sub","+35","chose","4_of_kind","full_house","s.str","l.str","yacht","total"
@@ -15,6 +16,37 @@ const chosemap_ennum = ['Aces', 'Deuces', 'Threes', 'Fours', 'Fives', 'Sixes'];
 const emptytable = {"1":-1,"2":-1,"3":-1,"4":-1,"5":-1,"6":-1,"sub":0,"+35":-1,"chose":-1,"4_of_kind":-1,"full_house":-1,"s.str":-1,"l.str":-1,"yacht":-1,"total":0};//空表
 const titel_cn = ["一點","二點","三點","四點","五點","六點","小計","獎勵 +35","全選","四骰同花","葫蘆","小順","大順","快艇","總積分"];
 const emptydice = {"dice" : [7,7,7,7,7], "keep" : [0,0,0,0,0]};//空骰子表 dice = 骰出 keep = 保留
+
+//讀寫JSON檔
+const playerjson = './player.json';
+const tablejson = './table.json';
+if(savetype.toLowerCase() == 'json'){
+  console.log('啟動JSON存檔');
+  try{
+    player = require(playerjson);
+    console.log('成功開啟player.json');
+  }catch(err){
+    let fs = require('fs');
+    fs.writeFile(playerjson, '', function (err) {
+      if (err)
+        console.log(err);
+      else
+        console.log('沒有找到player.json,建立一個新的');
+    });
+  }
+  try{
+    table = require(tablejson);
+    console.log('成功開啟table.json');
+  }catch(err){
+    let fs = require('fs');
+    fs.writeFile(tablejson, '', function (err) {
+      if (err)
+        console.log(err);
+      else
+        console.log('沒有找到table.json,建立一個新的');
+    });
+  }
+}
 
 const { Client, Intents, MessageActionRow } = require('discord.js');
 const Yacht_Dice_Bot = new Client({ intents: [
@@ -33,54 +65,58 @@ Yacht_Dice_Bot.on('messageCreate', message => {
   console.log(`[${message.channel.name}(${message.channelId})]${message.author.username}(${message.author.id}): ${message.content}`);
   if((!message.author.bot) && (message.channelId == accChannelid)){//確認訊息不是來自機器人的並且在允許的頻道
     if(message.mentions.users.size === 1 && message.mentions.users.every(user => !user.bot)){//發訊息者@1人並且不是@機器人
-      let matchid;//對手ID
-      message.mentions.users.each(user => matchid = user.id);
-        if(message.content.indexOf('來玩遊艇骰子') != -1){//確認格式
-          let bet = -1;
-          let checkbet = message.content.split(' ');//確認下注額
-          for(let i = 0; i < checkbet.length; i++){
-            if(IsNum(checkbet[i])){
-              bet = parseInt(checkbet[i], 10);
-            }
+      let matchuser;
+      message.mentions.users.each(user => matchuser = user);
+      let matchid = matchuser.id;//對手ID
+      if(message.content.indexOf(keyword) != -1){//確認格式
+        let bet = -1;
+        let checkbet = message.content.split(' ');//確認下注額
+        for(let i = 0; i < checkbet.length; i++){
+          if(IsNum(checkbet[i])){
+            bet = parseInt(checkbet[i], 10);
           }
-          if(player[message.author.id] == undefined){//發邀請者是否正在遊戲中 若否
-            if(player[matchid] == undefined){//被邀請者是否正在遊戲中 若否
-              message.channel.send('<@!' + matchid + '>\n<@!' + message.author.id + '> 邀請你玩遊艇骰子' + ((bet != -1) ? ',賭上' + bet + moneyunit : '') + ' 輸入Y接受 輸入N拒絕');
-              player[message.author.id] = {};
-              player[matchid] = {};
-              player[message.author.id].playing = false;
-              player[message.author.id].matching = true;
-              player[message.author.id].match = matchid;
-              player[message.author.id].reply = false;
-              player[message.author.id].bet = bet;
-              player[matchid].playing = false;
-              player[matchid].matching = true;
-              player[matchid].match = message.author.id;
-              player[matchid].reply = true;
-              player[matchid].bet = bet;    
-            }else{//被邀請者是否正在遊戲中 若是
-              if(player[matchid].playing){
-                message.reply('你想邀請的人已經在玩囉');
-              }else if(player[matchid].matching){
-                if(player[matchid].reply){
-                  message.reply('你想邀請的人已被其他人邀請');
-                }else{
-                  message.reply('你想邀請的人還在等待回應');
-                }
+        }
+        if(player[message.author.id] == undefined){//發邀請者是否正在遊戲中 若否
+          if(player[matchid] == undefined){//被邀請者是否正在遊戲中 若否
+            message.channel.send('<@!' + matchid + '>\n<@!' + message.author.id + '> 邀請你玩遊艇骰子' + ((bet != -1) ? ',賭上' + bet + moneyunit : '') + ' 輸入Y接受 輸入N拒絕');
+            player[message.author.id] = {};
+            player[matchid] = {};
+            player[message.author.id].playing = false;
+            player[message.author.id].matching = true;
+            player[message.author.id].match = matchid;
+            player[message.author.id].reply = false;
+            player[message.author.id].bet = bet;
+            player[message.author.id].name = message.author.username;
+            player[matchid].playing = false;
+            player[matchid].matching = true;
+            player[matchid].match = message.author.id;
+            player[matchid].reply = true;
+            player[matchid].bet = bet;  
+            player[matchid].name = matchuser.username;
+            save(playerjson, player); 
+          }else{//被邀請者是否正在遊戲中 若是
+            if(player[matchid].playing){
+              message.reply('你想邀請的人已經在玩囉');
+            }else if(player[matchid].matching){
+              if(player[matchid].reply){
+                message.reply('你想邀請的人已被其他人邀請');
               }else{
-                message.reply('你想邀請的人因為某些神秘力量而無法被邀請,請聯絡管理人員');
+                message.reply('你想邀請的人還在等待回應');
               }
-            }
-          }else{//發邀請者是否正在遊戲中 若是
-            if(player[message.author.id].playing){
-              message.reply('你已經在玩囉');
-            }else if(player[message.author.id].matching){
-              message.reply('你還在等待回應');
             }else{
-              message.reply('你因為某些神秘力量而無法發邀請,請聯絡管理人員');
+              message.reply('你想邀請的人因為某些神秘力量而無法被邀請,請聯絡管理人員');
             }
           }
-        }  
+        }else{//發邀請者是否正在遊戲中 若是
+          if(player[message.author.id].playing){
+            message.reply('你已經在玩囉');
+          }else if(player[message.author.id].matching){
+            message.reply('你還在等待回應');
+          }else{
+            message.reply('你因為某些神秘力量而無法發邀請,請聯絡管理人員');
+          }
+        }
+      }  
     }else if(player[message.author.id] != undefined){//發訊息者是否正在遊戲中 若是
       if(player[message.author.id].reply){//若是在等待回復
         if(message.content.toLowerCase() == 'y'){//若同意
@@ -93,6 +129,7 @@ Yacht_Dice_Bot.on('messageCreate', message => {
           player[matchid].reply = false;
           player[message.author.id].tableid = matchid;
           player[matchid].tableid = matchid;
+          save(playerjson, player); 
           message.reply('你同意了<@!' + matchid + '>的邀請 開始遊戲');
           //建表
           table[matchid] = {};
@@ -105,11 +142,13 @@ Yacht_Dice_Bot.on('messageCreate', message => {
           table[matchid].bet = player[message.author.id].bet;
           //第一回合
           dice(matchid);
+          save(tablejson, table); 
           showtable(message.channel, true, matchid, true, '骰出的骰子如下 輸入想保留的骰子編號保留並重骰 \n輸入"重骰"部交換直接重骰 輸入0不重骰開始選組合', '```' + showdice(matchid) + '```');
         }else{//若不同意
           message.reply('你拒絕了<@!' + player[message.author.id].match + '>的邀請');
           delete player[player[message.author.id].match];
           delete player[message.author.id];
+          save(playerjson, player); 
         }
       }else if(!player[message.author.id].matching){//若無在等待配對 則進入遊戲本體
         if(message.author.id == (table[player[message.author.id].tableid].round%2 == 0 ? player[message.author.id].tableid : table[player[message.author.id].tableid].id)){//若是發話者的回合
@@ -150,6 +189,7 @@ Yacht_Dice_Bot.on('messageCreate', message => {
                 table[tableid].stage++;
                 dice(tableid);
               }
+              save(tablejson, table); 
               if(table[tableid].stage != 3){
                 showtable(message, false, tableid, true, '骰出的骰子如下 輸入想保留的骰子編號保留並重骰 \n輸入"重骰"不交換直接重骰 輸入0不重骰開始選組合', '```' + showdice(tableid) + '```');        
               }else{
@@ -197,6 +237,7 @@ Yacht_Dice_Bot.on('messageCreate', message => {
                 tat += table[tableid][table[tableid].round%2 == 0 ? 'tablea' : 'tableb'][tablemap[i]] != -1 ? table[tableid][table[tableid].round%2 == 0 ? 'tablea' : 'tableb'][tablemap[i]] : 0;
               }
               table[tableid][table[tableid].round%2 == 0 ? 'tablea' : 'tableb'].total = tat;
+              save(tablejson, table); 
 
               //下一回合
               table[tableid].round++;
@@ -206,6 +247,7 @@ Yacht_Dice_Bot.on('messageCreate', message => {
                 dice(tableid);
                 message.channel.send('<@!' + (table[tableid].round%2 == 0 ? tableid : table[tableid].id) + '> 的回合');
                 showtable(message.channel, true, tableid, true, '骰出的骰子如下 輸入想保留的骰子編號保留並重骰 \n輸入"重骰"部交換直接重骰 輸入0不重骰開始選組合', '```' + showdice(tableid) + '```');
+                save(tablejson, table); 
               }else{//結束遊戲
                 message.channel.send('<@!' + tableid + '> <@!' + player[tableid].match + '>\n遊戲結束了 以下為結果');
                 let bet = table[tableid].bet;
@@ -241,6 +283,8 @@ Yacht_Dice_Bot.on('messageCreate', message => {
                 delete table[tableid];
                 delete player[player[message.author.id].match];
                 delete player[message.author.id];
+                save(tablejson, table); 
+                save(playerjson, player); 
               }
             break;
           }
@@ -264,9 +308,10 @@ function IsNum(s){//判斷是否為數字
 }
 
 function showtable(pos, ischannel, tableid, showpoint, Footertitel, Footer){ //顯示表格
+  console.log(tableid);
   //要發訊息的地方, 是否直接發在頻道, 表的ID, 是否顯示骰出分數, 註腳標題, 註腳內文
-  const namea = Yacht_Dice_Bot.users.cache.find(user => user.id === tableid.toString()).username;
-  const nameb = Yacht_Dice_Bot.users.cache.find(user => user.id === table[tableid].id.toString()).username;
+  const namea = player[tableid].name;
+  const nameb = player[table[tableid].id].name;
   
   let Fields;
   let titleDescription = '';
@@ -553,4 +598,11 @@ function autochose(tableid){//自動選擇
     chose = 0;
   }
   return chose;
+}
+
+function save(path, json){//存檔
+  if(savetype.toLowerCase() == 'json'){
+    let fs = require('fs');
+    fs.writeFileSync(path, JSON.stringify(json));
+  }
 }

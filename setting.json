@@ -1,6 +1,7 @@
 {
 	"token":"你的token",
 	"accChannelID":123456789,
-	"savetype":"ram",
-	"moneyunit":"元"
+	"savetype":"json",
+	"moneyunit":"元",
+	"keyword":"來玩遊艇骰子"
 }
