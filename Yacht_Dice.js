@@ -78,22 +78,41 @@ Yacht_Dice_Bot.on('messageCreate', message => {
         }
         if(player[message.author.id] == undefined){//發邀請者是否正在遊戲中 若否
           if(player[matchid] == undefined){//被邀請者是否正在遊戲中 若否
-            message.channel.send('<@!' + matchid + '>\n<@!' + message.author.id + '> 邀請你玩遊艇骰子' + ((bet != -1) ? ',賭上' + bet + moneyunit : '') + ' 輸入Y接受 輸入N拒絕');
-            player[message.author.id] = {};
-            player[matchid] = {};
-            player[message.author.id].playing = false;
-            player[message.author.id].matching = true;
-            player[message.author.id].match = matchid;
-            player[message.author.id].reply = false;
-            player[message.author.id].bet = bet;
-            player[message.author.id].name = message.author.username;
-            player[matchid].playing = false;
-            player[matchid].matching = true;
-            player[matchid].match = message.author.id;
-            player[matchid].reply = true;
-            player[matchid].bet = bet;  
-            player[matchid].name = matchuser.username;
-            save(playerjson, player); 
+            let bet_check = true;
+            let p1_money = 0;
+            let p2_money = 0;
+            //將p1_money設定為ID是message.author.id的金錢量
+            //p1_money = ;
+            //將p2_money設定為ID是matchid的金錢量
+            //p2_money = ;
+            //將以下註解解開
+            /*
+            if(p1_money < bet){
+              message.reply('你所擁有的錢不夠,無法邀請');
+              bet_check = false;
+            }else if(p2_money < bet){
+              message.reply('你想邀請的人所擁有的錢不夠,無法邀請');
+              bet_check = false;
+            }
+            */
+            if(bet_check){
+              message.channel.send('<@!' + matchid + '>\n<@!' + message.author.id + '> 邀請你玩遊艇骰子' + ((bet != -1) ? ',賭上' + bet + moneyunit : '') + ' 輸入Y接受 輸入N拒絕');
+              player[message.author.id] = {};
+              player[matchid] = {};
+              player[message.author.id].playing = false;
+              player[message.author.id].matching = true;
+              player[message.author.id].match = matchid;
+              player[message.author.id].reply = false;
+              player[message.author.id].bet = bet;
+              player[message.author.id].name = message.author.username;
+              player[matchid].playing = false;
+              player[matchid].matching = true;
+              player[matchid].match = message.author.id;
+              player[matchid].reply = true;
+              player[matchid].bet = bet;  
+              player[matchid].name = matchuser.username;
+              save(playerjson, player); 
+            }
           }else{//被邀請者是否正在遊戲中 若是
             if(player[matchid].playing){
               message.reply('你想邀請的人已經在玩囉');
@@ -154,7 +173,7 @@ Yacht_Dice_Bot.on('messageCreate', message => {
         if(message.author.id == (table[player[message.author.id].tableid].round%2 == 0 ? player[message.author.id].tableid : table[player[message.author.id].tableid].id)){//若是發話者的回合
           let tableid = player[message.author.id].tableid;
           switch(table[tableid].stage){
-            case 1:
+            case 1://第1,2階段
             case 2:
               let numbarr = prenum05(message.content);
               if(numbarr[0]){
@@ -261,9 +280,11 @@ Yacht_Dice_Bot.on('messageCreate', message => {
                     say = '由' + Yacht_Dice_Bot.users.cache.find(user => user.id === playeraid.toString()).username + '獲得勝利';
                     if(bet > 0){
                       say += '\n賭注為' + bet + moneyunit;
+                      //完成遊戲金錢加減
                       //在這裡幫playeraid加上bet數量的錢
 
                       //在這裡幫playerbid扣掉bet數量的錢
+
                     }
                   break;
                   case totala < totalb :
