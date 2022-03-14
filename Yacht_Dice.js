@@ -1,7 +1,7 @@
 const { MessageEmbed } = require('discord.js');
 const setting = require('./setting.json');
 const token = setting.token;
-const accChannelid = setting.accChannelID;//允許的頻道ID
+const accChannelid = setting.accChannelID;//允許的頻道ID 設0為不限制
 const savetype = setting.savetype;//資料儲存模式 ram = 僅存於記憶體(default), json = 存檔於JSON中
 const moneyunit = setting.moneyunit;//金錢單位 ex:元,G,個硬幣,根蘿蔔 之類的詞 設定成奇怪的東西可能會出事
 const keyword = setting.keyword;//邀請遊戲關鍵字
@@ -63,7 +63,7 @@ Yacht_Dice_Bot.on('ready', () => {
 //主程式 接收訊息系統
 Yacht_Dice_Bot.on('messageCreate', message => {
   console.log(`[${message.channel.name}(${message.channelId})]${message.author.username}(${message.author.id}): ${message.content}`);
-  if((!message.author.bot) && (message.channelId == accChannelid)){//確認訊息不是來自機器人的並且在允許的頻道
+  if((!message.author.bot) && ((message.channelId == accChannelid) || (accChannelid == 0))){//確認訊息不是來自機器人的並且在允許的頻道
     if(message.mentions.users.size === 1 && message.mentions.users.every(user => !user.bot)){//發訊息者@1人並且不是@機器人
       let matchuser;
       message.mentions.users.each(user => matchuser = user);
